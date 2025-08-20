@@ -1,0 +1,8 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/create/page": "/create",
+  "/edit/[id]/page": "/edit/[id]",
+  "/page": "/",
+  "/timer/[id]/page": "/timer/[id]",
+  "/view/[id]/page": "/view/[id]"
+}
