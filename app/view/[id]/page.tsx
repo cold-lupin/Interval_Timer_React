@@ -23,12 +23,19 @@ const exerciseTypeLabels: Record<ExerciseType, string> = {
 }
 
 const exerciseTypeColors: Record<ExerciseType, string> = {
+  running: "bg-pink-100 text-pink-800 border-pink-200",
+  walking: "bg-green-100 text-green-800 border-green-200",
+  rest: "bg-yellow-100 text-yellow-800 border-yellow-200",
+}
+
+const exerciseTypeChartColors: Record<ExerciseType, string> = {
   running: "bg-pink-400",
   walking: "bg-green-300",
   rest: "bg-yellow-200",
 }
 
 const warmupCooldownColor = "bg-sky-300"
+const warmupCooldownBoxColor = "bg-sky-100 text-sky-800 border-sky-200"
 
 export default function ViewTimerPage({ params }: { params: { id: string } }) {
   const [workout, setWorkout] = useState<WorkoutPlan | null>(null)
@@ -143,20 +150,47 @@ export default function ViewTimerPage({ params }: { params: { id: string } }) {
   const renderWorkoutStructure = (items: typeof workout.items, depth = 0) => {
     return items.map((item) => (
       <div key={item.id} className={`${depth > 0 ? "ml-6 border-l-2 border-border pl-4" : ""}`}>
-        <div className="flex items-center gap-3 py-2">
+        <div className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg mb-2">
           {item.type === "set" ? (
             <>
-              <div className="w-3 h-3 bg-accent rounded-full"></div>
-              <span className="font-medium">세트 ({item.repetitions}회 반복)</span>
+              <div className="w-4 h-4 bg-accent rounded-full shadow-sm"></div>
+              <div className="flex-1">
+                <div className="font-semibold text-foreground">세트</div>
+                <div className="text-sm text-muted-foreground">{item.repetitions}회 반복</div>
+              </div>
+            </>
+          ) : item.type === "rest" ? (
+            <>
+              <div className="flex-1 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`inline-block px-2 py-1 rounded-md text-xs font-medium border ${exerciseTypeColors[item.type]}`}
+                  >
+                    휴식
+                  </div>
+                  <span className="text-sm font-medium">{formatTimeShort(item.duration)}</span>
+                </div>
+                <div className="text-sm font-medium text-primary">
+                  강도 {calculateFinalIntensity(item.type, item.intensity || "medium")}
+                </div>
+              </div>
             </>
           ) : (
             <>
-              <div className={`w-3 h-3 rounded-full ${exerciseTypeColors[item.type]}`}></div>
-              <span className="font-medium">{getIntensityLabel(item.type, item.intensity || "medium")}</span>
-              <span className="text-sm text-muted-foreground">{formatTimeShort(item.duration)}</span>
-              <span className="text-xs text-muted-foreground">
-                (강도 {calculateFinalIntensity(item.type, item.intensity || "medium")})
-              </span>
+              <div className="flex-1 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`inline-block px-2 py-1 rounded-md text-xs font-medium border ${exerciseTypeColors[item.type]}`}
+                  >
+                    {exerciseTypeLabels[item.type]}
+                  </div>
+                  <span className="text-sm font-medium">{formatTimeShort(item.duration)}</span>
+                </div>
+                <div className="text-sm font-medium text-primary">
+                  {getIntensityLabel(item.type, item.intensity || "medium")} · 강도{" "}
+                  {calculateFinalIntensity(item.type, item.intensity || "medium")}
+                </div>
+              </div>
             </>
           )}
         </div>
@@ -244,13 +278,15 @@ export default function ViewTimerPage({ params }: { params: { id: string } }) {
               <CardContent>
                 <div className="space-y-4">
                   {/* Chart */}
-                  <div className="relative h-32 bg-muted rounded-lg overflow-hidden">
-                    <div className="absolute inset-0 flex items-end">
+                  <div className="relative h-32 bg-muted rounded-lg overflow-visible">
+                    <div className="absolute inset-0 flex items-end overflow-hidden rounded-lg">
                       {timelineData.map((item, index) => {
                         const width = (item.duration / totalTime) * 100
                         const maxIntensity = 5
                         const height = Math.max((item.finalIntensity / maxIntensity) * 100, 8) // 최소 8% 높이 보장
-                        const colorClass = item.isWarmupCooldown ? warmupCooldownColor : exerciseTypeColors[item.type]
+                        const colorClass = item.isWarmupCooldown
+                          ? warmupCooldownColor
+                          : exerciseTypeChartColors[item.type]
                         return (
                           <div
                             key={index}
@@ -261,9 +297,15 @@ export default function ViewTimerPage({ params }: { params: { id: string } }) {
                             }}
                           >
                             {/* Tooltip */}
-                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                              {item.name || getIntensityLabel(item.type, item.intensity || "medium")} -{" "}
-                              {formatTimeShort(item.duration)} (강도 {item.finalIntensity})
+                            <div
+                              className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg border border-gray-700 pointer-events-none"
+                              style={{ zIndex: 2147483647, position: "fixed" }}
+                            >
+                              {item.name ||
+                                (item.type === "rest"
+                                  ? "휴식"
+                                  : `${exerciseTypeLabels[item.type]} ${getIntensityLabel(item.type, item.intensity || "medium")}`)}{" "}
+                              - {formatTimeShort(item.duration)} (강도 {item.finalIntensity})
                             </div>
                           </div>
                         )
@@ -316,20 +358,34 @@ export default function ViewTimerPage({ params }: { params: { id: string } }) {
               <CardContent>
                 <div className="space-y-3">
                   {timelineData.map((item, index) => (
-                    <div key={index} className="flex items-center gap-4 p-3 bg-muted rounded-lg">
-                      <div className="text-sm font-mono text-muted-foreground min-w-[60px]">
+                    <div
+                      key={index}
+                      className="flex items-center gap-4 p-4 bg-card border border-border rounded-lg hover:shadow-sm transition-shadow"
+                    >
+                      <div className="text-sm font-mono text-muted-foreground min-w-[60px] bg-muted px-2 py-1 rounded">
                         {formatTime(item.startTime)}
                       </div>
-                      <div
-                        className={`w-4 h-4 rounded-full ${item.isWarmupCooldown ? warmupCooldownColor : exerciseTypeColors[item.type]}`}
-                      ></div>
-                      <div className="flex-1">
-                        <div className="font-medium">
-                          {item.name || getIntensityLabel(item.type, item.intensity || "medium")}
+                      <div className="flex-1 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`inline-block px-2 py-1 rounded-md text-xs font-medium border ${
+                              item.isWarmupCooldown ? warmupCooldownBoxColor : exerciseTypeColors[item.type]
+                            }`}
+                          >
+                            {item.name || (item.type === "rest" ? "휴식" : exerciseTypeLabels[item.type])}
+                          </div>
+                          <span className="text-sm font-medium">{formatTimeShort(item.duration)}</span>
                         </div>
-                        <div className="text-sm text-muted-foreground">{formatTimeShort(item.duration)}</div>
+                        <div className="text-sm font-medium text-primary">
+                          {item.type !== "rest" && !item.isWarmupCooldown ? (
+                            <>
+                              {getIntensityLabel(item.type, item.intensity || "medium")} · 강도 {item.finalIntensity}
+                            </>
+                          ) : (
+                            <>강도 {item.finalIntensity}</>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-sm text-muted-foreground">강도 {item.finalIntensity}</div>
                     </div>
                   ))}
                 </div>
@@ -347,11 +403,18 @@ export default function ViewTimerPage({ params }: { params: { id: string } }) {
                 <div className="space-y-4">
                   {/* Warmup */}
                   {workout.warmupTime > 0 && (
-                    <div className="flex items-center gap-3 py-2 border-b border-border">
-                      <div className="w-3 h-3 bg-sky-300 rounded-full"></div>
-                      <span className="font-medium">웜업</span>
-                      <span className="text-sm text-muted-foreground">{formatTimeShort(workout.warmupTime)}</span>
-                      <span className="text-xs text-muted-foreground">(강도 {getWarmupCooldownIntensity()})</span>
+                    <div className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg">
+                      <div className="flex-1 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`inline-block px-2 py-1 rounded-md text-xs font-medium border ${warmupCooldownBoxColor}`}
+                          >
+                            웜업
+                          </div>
+                          <span className="text-sm font-medium">{formatTimeShort(workout.warmupTime)}</span>
+                        </div>
+                        <div className="text-sm font-medium text-primary">강도 {getWarmupCooldownIntensity()}</div>
+                      </div>
                     </div>
                   )}
 
@@ -360,11 +423,18 @@ export default function ViewTimerPage({ params }: { params: { id: string } }) {
 
                   {/* Cooldown */}
                   {workout.cooldownTime > 0 && (
-                    <div className="flex items-center gap-3 py-2 border-t border-border">
-                      <div className="w-3 h-3 bg-sky-300 rounded-full"></div>
-                      <span className="font-medium">쿨다운</span>
-                      <span className="text-sm text-muted-foreground">{formatTimeShort(workout.cooldownTime)}</span>
-                      <span className="text-xs text-muted-foreground">(강도 {getWarmupCooldownIntensity()})</span>
+                    <div className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg">
+                      <div className="flex-1 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`inline-block px-2 py-1 rounded-md text-xs font-medium border ${warmupCooldownBoxColor}`}
+                          >
+                            쿨다운
+                          </div>
+                          <span className="text-sm font-medium">{formatTimeShort(workout.cooldownTime)}</span>
+                        </div>
+                        <div className="text-sm font-medium text-primary">강도 {getWarmupCooldownIntensity()}</div>
+                      </div>
                     </div>
                   )}
                 </div>

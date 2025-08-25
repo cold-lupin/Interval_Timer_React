@@ -1,4 +1,4 @@
-export type ExerciseType = "running" | "walking" | "rest"
+export type ExerciseType = "running" | "walking"
 export type IntensityLevel = "low" | "medium" | "high"
 export type ExerciseIntensity = IntensityLevel
 
@@ -14,11 +14,18 @@ export interface Set {
   id: string
   type: "set"
   repetitions: number
-  items: (Exercise | Set)[]
+  items: (Exercise | Set | Rest)[]
   name?: string
 }
 
-export type WorkoutItem = Exercise | Set
+export interface Rest {
+  id: string
+  type: "rest"
+  duration: number // seconds
+  name?: string
+}
+
+export type WorkoutItem = Exercise | Set | Rest
 
 export interface WorkoutPlan {
   id: string
@@ -137,8 +144,8 @@ export const deleteWorkout = (id: string): boolean => {
 }
 
 // Utility functions for workout calculations
-export const flattenWorkout = (items: WorkoutItem[], repetitions = 1): Exercise[] => {
-  const result: Exercise[] = []
+export const flattenWorkout = (items: WorkoutItem[], repetitions = 1): (Exercise | Rest)[] => {
+  const result: (Exercise | Rest)[] = []
 
   for (let rep = 0; rep < repetitions; rep++) {
     for (const item of items) {
@@ -291,8 +298,6 @@ export const initializeSampleData = (): void => {
 // Utility functions for intensity calculations
 export const getBaseIntensity = (type: ExerciseType): number => {
   switch (type) {
-    case "rest":
-      return 1
     case "walking":
       return 2
     case "running":
@@ -317,16 +322,14 @@ export const getIntensityMultiplier = (intensity: IntensityLevel): number => {
 
 export const calculateFinalIntensity = (type: ExerciseType, intensity: IntensityLevel = "medium"): number => {
   switch (type) {
-    case "rest":
-      return 1 // 휴식은 항상 1
     case "walking":
       switch (intensity) {
         case "low":
-          return 1 // 느린 걷기
+          return 1 // 천천히
         case "medium":
-          return 2 // 보통 걷기
+          return 2 // 보통
         case "high":
-          return 3 // 빠른 걷기
+          return 3 // 빠르게
         default:
           return 2
       }
@@ -335,7 +338,7 @@ export const calculateFinalIntensity = (type: ExerciseType, intensity: Intensity
         case "low":
           return 3 // 조깅
         case "medium":
-          return 4 // 보통 달리기
+          return 4 // 보통
         case "high":
           return 5 // 전속력
         default:
@@ -346,19 +349,21 @@ export const calculateFinalIntensity = (type: ExerciseType, intensity: Intensity
   }
 }
 
-export const getWarmupCooldownIntensity = (): number => {
-  return 2 // 웜업/쿨다운은 항상 2
+export const getRestIntensity = (): number => {
+  return 1 // 휴식은 항상 1
 }
 
 export const getIntensityLabel = (type: ExerciseType, intensity: IntensityLevel): string => {
   switch (type) {
     case "walking":
-      return intensity === "low" ? "느린 걷기" : intensity === "high" ? "빠른 걷기" : "보통 걷기"
+      return intensity === "low" ? "천천히" : intensity === "high" ? "빠르게" : "보통"
     case "running":
-      return intensity === "low" ? "조깅" : intensity === "high" ? "전속력" : "빠른 달리기"
-    case "rest":
-      return "휴식"
+      return intensity === "low" ? "조깅" : intensity === "high" ? "전속력" : "보통"
     default:
       return "운동"
   }
+}
+
+export const getWarmupCooldownIntensity = (): number => {
+  return 2 // 웜업과 쿨다운은 항상 강도 2
 }

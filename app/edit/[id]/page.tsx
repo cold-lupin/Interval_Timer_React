@@ -14,55 +14,39 @@ import {
   getWorkout,
   updateWorkout,
   generateId,
+  getIntensityLabel,
   type ExerciseType,
   type Exercise,
   type Set,
+  type Rest,
   type WorkoutItem,
   type WorkoutPlan,
-  type ExerciseIntensity,
+  type IntensityLevel,
 } from "@/lib/timer-storage"
 
 const exerciseTypeLabels: Record<ExerciseType, string> = {
   running: "달리기",
   walking: "걷기",
-  rest: "휴식",
-}
-
-const intensityLabels: Record<ExerciseIntensity, string> = {
-  low: "낮음",
-  medium: "보통",
-  high: "높음",
-}
-
-const getIntensityOptions = (type: ExerciseType): { value: ExerciseIntensity; label: string }[] => {
-  switch (type) {
-    case "walking":
-      return [
-        { value: "low", label: "천천히" },
-        { value: "medium", label: "보통" },
-        { value: "high", label: "빠르게" },
-      ]
-    case "running":
-      return [
-        { value: "low", label: "조깅" },
-        { value: "medium", label: "보통" },
-        { value: "high", label: "전속력" },
-      ]
-    case "rest":
-      return [{ value: "low", label: "휴식" }]
-    default:
-      return [
-        { value: "low", label: "낮음" },
-        { value: "medium", label: "보통" },
-        { value: "high", label: "높음" },
-      ]
-  }
 }
 
 const exerciseTypeColors: Record<ExerciseType, string> = {
-  running: "bg-red-100 text-red-800 border-red-200",
-  walking: "bg-blue-100 text-blue-800 border-blue-200",
-  rest: "bg-gray-100 text-gray-800 border-gray-200",
+  running: "bg-pink-100 text-pink-800 border-pink-200",
+  walking: "bg-green-100 text-green-800 border-green-200",
+}
+
+const restColor = "bg-yellow-100 text-yellow-800 border-yellow-200"
+
+const intensityOptions: Record<ExerciseType, { value: IntensityLevel; label: string }[]> = {
+  walking: [
+    { value: "low", label: "천천히" },
+    { value: "medium", label: "보통" },
+    { value: "high", label: "빠르게" },
+  ],
+  running: [
+    { value: "low", label: "조깅" },
+    { value: "medium", label: "보통" },
+    { value: "high", label: "전속력" },
+  ],
 }
 
 export default function EditTimerPage({ params }: { params: { id: string } }) {
@@ -77,7 +61,7 @@ export default function EditTimerPage({ params }: { params: { id: string } }) {
     type?: ExerciseType
     duration?: number
     repetitions?: number
-    intensity?: ExerciseIntensity
+    intensity?: IntensityLevel
   }>({})
 
   useEffect(() => {
@@ -98,7 +82,7 @@ export default function EditTimerPage({ params }: { params: { id: string } }) {
     return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
-  const updateItem = (itemId: string, updates: Partial<Exercise | Set>) => {
+  const updateItem = (itemId: string, updates: Partial<Exercise | Set | Rest>) => {
     if (!workout) return
 
     const updateInItems = (items: WorkoutItem[]): WorkoutItem[] => {
@@ -128,6 +112,8 @@ export default function EditTimerPage({ params }: { params: { id: string } }) {
     setEditingItemId(item.id)
     if (item.type === "set") {
       setEditingValues({ repetitions: item.repetitions })
+    } else if (item.type === "rest") {
+      setEditingValues({ duration: item.duration })
     } else {
       setEditingValues({
         type: item.type,
@@ -150,14 +136,14 @@ export default function EditTimerPage({ params }: { params: { id: string } }) {
     setEditingValues({})
   }
 
-  const addExercise = (type: ExerciseType, duration: number, intensity: ExerciseIntensity, parentId?: string) => {
+  const addExercise = (type: ExerciseType, intensity: IntensityLevel, duration: number, parentId?: string) => {
     if (!workout) return
 
     const newExercise: Exercise = {
       id: generateId(),
       type,
-      duration,
       intensity,
+      duration,
     }
 
     if (parentId) {
@@ -174,6 +160,34 @@ export default function EditTimerPage({ params }: { params: { id: string } }) {
         return {
           ...prev,
           items: [...prev.items, newExercise],
+        }
+      })
+    }
+  }
+
+  const addRest = (duration: number, parentId?: string) => {
+    if (!workout) return
+
+    const newRest: Rest = {
+      id: generateId(),
+      type: "rest",
+      duration,
+    }
+
+    if (parentId) {
+      setWorkout((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          items: addToParent(prev.items, parentId, newRest),
+        }
+      })
+    } else {
+      setWorkout((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          items: [...prev.items, newRest],
         }
       })
     }
@@ -326,6 +340,7 @@ export default function EditTimerPage({ params }: { params: { id: string } }) {
 
   const renderWorkoutItem = (item: WorkoutItem, depth = 0, parentId?: string) => {
     const isSet = item.type === "set"
+    const isRest = item.type === "rest"
     const isEditing = editingItemId === item.id
 
     return (
@@ -355,6 +370,27 @@ export default function EditTimerPage({ params }: { params: { id: string } }) {
                       />
                       <span className="text-sm text-muted-foreground">회 반복</span>
                     </>
+                  ) : isRest ? (
+                    <>
+                      <div className={`inline-block px-2 py-1 rounded-md text-xs font-medium border ${restColor}`}>
+                        휴식
+                      </div>
+                      <span>/</span>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={editingValues.duration || 60}
+                        onChange={(e) =>
+                          setEditingValues((prev) => ({
+                            ...prev,
+                            duration: Number.parseInt(e.target.value) || 1,
+                          }))
+                        }
+                        className="w-16 h-8"
+                        autoFocus
+                      />
+                      <span className="text-sm text-muted-foreground">초</span>
+                    </>
                   ) : (
                     <>
                       <Select
@@ -363,7 +399,7 @@ export default function EditTimerPage({ params }: { params: { id: string } }) {
                           setEditingValues((prev) => ({
                             ...prev,
                             type: value,
-                            intensity: value === "rest" ? "low" : "medium",
+                            intensity: "medium",
                           }))
                         }
                       >
@@ -373,20 +409,19 @@ export default function EditTimerPage({ params }: { params: { id: string } }) {
                         <SelectContent>
                           <SelectItem value="running">달리기</SelectItem>
                           <SelectItem value="walking">걷기</SelectItem>
-                          <SelectItem value="rest">휴식</SelectItem>
                         </SelectContent>
                       </Select>
                       <Select
                         value={editingValues.intensity || "medium"}
-                        onValueChange={(value: ExerciseIntensity) =>
+                        onValueChange={(value: IntensityLevel) =>
                           setEditingValues((prev) => ({ ...prev, intensity: value }))
                         }
                       >
-                        <SelectTrigger className="w-28 h-8">
+                        <SelectTrigger className="w-20 h-8">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {getIntensityOptions(editingValues.type || "running").map((option) => (
+                          {intensityOptions[editingValues.type || "running"].map((option) => (
                             <SelectItem key={option.value} value={option.value}>
                               {option.label}
                             </SelectItem>
@@ -433,6 +468,14 @@ export default function EditTimerPage({ params }: { params: { id: string } }) {
                         <span>/</span>
                         <span className="text-sm text-muted-foreground">{item.repetitions}회 반복</span>
                       </>
+                    ) : isRest ? (
+                      <>
+                        <div className={`inline-block px-2 py-1 rounded-md text-xs font-medium border ${restColor}`}>
+                          휴식
+                        </div>
+                        <span>/</span>
+                        <span className="font-medium">{formatTime(item.duration)}</span>
+                      </>
                     ) : (
                       <>
                         <div
@@ -441,10 +484,7 @@ export default function EditTimerPage({ params }: { params: { id: string } }) {
                           {exerciseTypeLabels[item.type]}
                         </div>
                         <span className="text-sm font-medium">
-                          {
-                            getIntensityOptions(item.type).find((opt) => opt.value === (item.intensity || "medium"))
-                              ?.label
-                          }
+                          {getIntensityLabel(item.type, item.intensity || "medium")}
                         </span>
                         <span>/</span>
                         <span className="font-medium">{formatTime(item.duration)}</span>
@@ -649,12 +689,16 @@ export default function EditTimerPage({ params }: { params: { id: string } }) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{currentParentId ? "세트에 추가" : "새 항목 추가"}</DialogTitle>
-            <DialogDescription>훈련 또는 세트를 추가할 수 있습니다.</DialogDescription>
+            <DialogDescription>훈련, 세트 또는 휴식을 추가할 수 있습니다.</DialogDescription>
           </DialogHeader>
 
           <AddItemForm
-            onAddExercise={(type, duration, intensity) => {
-              addExercise(type, duration, intensity, currentParentId || undefined)
+            onAddExercise={(type, intensity, duration) => {
+              addExercise(type, intensity, duration, currentParentId || undefined)
+              setIsAddDialogOpen(false)
+            }}
+            onAddRest={(duration) => {
+              addRest(duration, currentParentId || undefined)
               setIsAddDialogOpen(false)
             }}
             onAddSet={(repetitions) => {
@@ -671,22 +715,26 @@ export default function EditTimerPage({ params }: { params: { id: string } }) {
 
 function AddItemForm({
   onAddExercise,
+  onAddRest,
   onAddSet,
   onCancel,
 }: {
-  onAddExercise: (type: ExerciseType, duration: number, intensity: ExerciseIntensity) => void
+  onAddExercise: (type: ExerciseType, intensity: IntensityLevel, duration: number) => void
+  onAddRest: (duration: number) => void
   onAddSet: (repetitions: number) => void
   onCancel: () => void
 }) {
-  const [itemType, setItemType] = useState<"exercise" | "set">("exercise")
+  const [itemType, setItemType] = useState<"exercise" | "set" | "rest">("exercise")
   const [exerciseType, setExerciseType] = useState<ExerciseType>("running")
+  const [intensity, setIntensity] = useState<IntensityLevel>("medium")
   const [duration, setDuration] = useState(60)
   const [repetitions, setRepetitions] = useState(3)
-  const [intensity, setIntensity] = useState<ExerciseIntensity>("medium")
 
   const handleSubmit = () => {
     if (itemType === "exercise") {
-      onAddExercise(exerciseType, duration, intensity)
+      onAddExercise(exerciseType, intensity, duration)
+    } else if (itemType === "rest") {
+      onAddRest(duration)
     } else {
       onAddSet(repetitions)
     }
@@ -696,35 +744,35 @@ function AddItemForm({
     <div className="space-y-4">
       <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
         <div style={{ flex: "1", minWidth: "160px" }}>
-          <Label>추가할 항목</Label>
-          <Select value={itemType} onValueChange={(value: "exercise" | "set") => setItemType(value)}>
-            <SelectTrigger>
+          <Label className="text-sm font-medium">추가할 항목</Label>
+          <Select value={itemType} onValueChange={(value: "exercise" | "set" | "rest") => setItemType(value)}>
+            <SelectTrigger className="mt-1">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="exercise">훈련</SelectItem>
               <SelectItem value="set">세트</SelectItem>
+              <SelectItem value="rest">휴식</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         {itemType === "exercise" && (
           <div style={{ flex: "1", minWidth: "160px" }}>
-            <Label>운동 종류</Label>
+            <Label className="text-sm font-medium">운동 종류</Label>
             <Select
               value={exerciseType}
               onValueChange={(value: ExerciseType) => {
                 setExerciseType(value)
-                setIntensity(value === "rest" ? "low" : "medium")
+                setIntensity("medium")
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className="mt-1">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="running">달리기</SelectItem>
                 <SelectItem value="walking">걷기</SelectItem>
-                <SelectItem value="rest">휴식</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -732,46 +780,62 @@ function AddItemForm({
       </div>
 
       {itemType === "exercise" ? (
-        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-          <div style={{ flex: "1", minWidth: "160px" }}>
-            <Label>강도</Label>
-            <Select value={intensity} onValueChange={(value: ExerciseIntensity) => setIntensity(value)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {getIntensityOptions(exerciseType).map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <>
+          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+            <div style={{ flex: "1", minWidth: "160px" }}>
+              <Label className="text-sm font-medium">강도</Label>
+              <Select value={intensity} onValueChange={(value: IntensityLevel) => setIntensity(value)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {intensityOptions[exerciseType].map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div style={{ flex: "1", minWidth: "160px" }}>
+              <Label className="text-sm font-medium">시간 (초)</Label>
+              <Input
+                type="number"
+                min="1"
+                value={duration}
+                onChange={(e) => setDuration(Number.parseInt(e.target.value) || 1)}
+                className="mt-1"
+              />
+            </div>
           </div>
-          <div style={{ flex: "1", minWidth: "160px" }}>
-            <Label>시간 (초)</Label>
-            <Input
-              type="number"
-              min="1"
-              value={duration}
-              onChange={(e) => setDuration(Number.parseInt(e.target.value) || 1)}
-            />
-          </div>
+        </>
+      ) : itemType === "rest" ? (
+        <div>
+          <Label className="text-sm font-medium">시간 (초)</Label>
+          <Input
+            type="number"
+            min="1"
+            value={duration}
+            onChange={(e) => setDuration(Number.parseInt(e.target.value) || 1)}
+            className="mt-1"
+          />
         </div>
       ) : (
         <div>
-          <Label>반복 횟수</Label>
+          <Label className="text-sm font-medium">반복횟수</Label>
           <Input
             type="number"
             min="1"
             value={repetitions}
             onChange={(e) => setRepetitions(Number.parseInt(e.target.value) || 1)}
+            className="mt-1"
           />
         </div>
       )}
 
-      <div className="flex gap-2 pt-4">
-        <Button onClick={handleSubmit} className="flex-1">
+      <div className="flex gap-2 pt-2">
+        <Button onClick={handleSubmit} className="flex-1 bg-primary hover:bg-primary/90">
           추가
         </Button>
         <Button variant="outline" onClick={onCancel} className="flex-1 bg-transparent">
